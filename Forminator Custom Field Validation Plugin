@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: [Forminator] - Validation form fields.
  * Description: [Forminator] - plugin allows you to define custom validation rules for specific fields in your Forminator forms. This example demonstrates how to validate a form field to ensure it contains exactly 14 numeric characters.
@@ -6,157 +7,175 @@
  * Author: Ahmed Magdy
  * Author URI: https://abprojects.org/
  * License: GPLv2 or later
-*/
+ */
 
-if ( ! defined( 'ABSPATH' ) || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
-    return;
+if (!defined('ABSPATH') || (defined('WP_CLI') && WP_CLI)) {
+  return;
 }
 
-add_action( 'after_setup_theme', 'forminator_form_field_validation', 100 );
-function forminator_form_field_validation() {
-    if ( defined( 'FORMINATOR_PRO' ) && class_exists( 'Forminator' ) ) {
-        class Forminator_Field_Custom_Validation {
-            private $form_custom_validation_list = array(
-                array(
-                    'form_id'                  => '251', // form id.
-                    'field_name'               => 'text-1', // the field name that you want to validate.
-                    'field_validation_pattern' => array(
-                        '/^\d{14}$/', // Validation for exactly 14 numeric characters.
-                    ),
-                    'error_message'            => 'The national ID must be exactly 14 digits.', // error message.
-                ),
-            );
+add_action('after_setup_theme', 'forminator_form_field_validation', 100);
+function forminator_form_field_validation()
+{
+  if (defined('FORMINATOR_PRO') && class_exists('Forminator')) {
+    class Forminator_Field_Custom_Validation
+    {
+      private $form_custom_validation_list = array(
+        array(
+          'form_id'                  => '251', // form id.
+          'field_name'               => 'text-1', // the field name that you want to validate.
+          'field_validation_pattern' => array(
+            '/^\d{14}$/', // Validation for exactly 14 numeric characters.
+          ),
+          'error_message'            => 'The national ID must be exactly 14 digits.', // error message.
+        ),
 
-            private static $instance;
+        // ADD YOUR EXTRA VALIDATION HERE //
+        // array(
+        //   'form_id'                  => '251', // form id.
+        //   'field_name'               => 'text-1', // the field name that you want to validate.
+        //   'field_validation_pattern' => array(
+        //     '/^\d{14}$/', // Validation for exactly 14 numeric characters.
+        //   ),
+        //   'error_message'            => 'The national ID must be exactly 14 digits.', // error message.
+        // ),
+      );
 
-            public function __construct() {
-                add_action( 'wp_footer', array( $this, 'forminator_field_custom_validation_js' ), 100 );
-                add_action( 'wp_ajax_forminator_form_custom_validation', array( $this, 'forminator_form_field_custom_validation' ) );
-                add_action( 'wp_ajax_nopriv_forminator_form_custom_validation', array( $this, 'forminator_form_field_custom_validation' ) );
-                add_filter( 'forminator_custom_form_submit_errors', array( $this, 'forminator_form_ajax_submit_response_handler' ), 100 );
-            }
+      private static $instance;
 
-            public static function get_instance() {
-                if ( is_null( self::$instance ) ) {
-                    self::$instance = new self();
-                }
-                return self::$instance;
-            }
+      public function __construct()
+      {
+        add_action('wp_footer', array($this, 'forminator_field_custom_validation_js'), 100);
+        add_action('wp_ajax_forminator_form_custom_validation', array($this, 'forminator_form_field_custom_validation'));
+        add_action('wp_ajax_nopriv_forminator_form_custom_validation', array($this, 'forminator_form_field_custom_validation'));
+        add_filter('forminator_custom_form_submit_errors', array($this, 'forminator_form_ajax_submit_response_handler'), 100);
+      }
 
-            public function forminator_field_custom_validation_js() {
-                foreach ( $this->form_custom_validation_list as $form_custom_validation ) {
-                    $form_id = $form_custom_validation['form_id'];
-                    $field_name = $form_custom_validation['field_name'];
-                    ?>
-                    <script type="text/javascript">
-                        document.addEventListener('DOMContentLoaded', function(){
-                            let form_id_input = document.querySelector('input[name="form_id"]');
-                            let field_name = document.querySelector('input[id="<?php echo $field_name; ?>"]');
-                            if ( form_id_input && field_name && form_id_input.value == '<?php echo $form_id; ?>' ) {
-                                (function($){
-                                    $(field_name).on('keyup blur', function(){
-                                        let field_value = $(this).val();
-                                        if ( !/^\d{14}$/.test(field_value) ) {
-                                            $('.forminator-button-next').prop('disabled', true);
-                                            $(field_name).parent().addClass('forminator-has_error');
-                                            $('.forminator-error-message').remove();
-                                            $(field_name).parent().append('<span class="forminator-error-message"><?php echo $form_custom_validation['error_message']; ?></span>');
-                                        } else {
-                                            let ajax_nonce = '<?php echo wp_create_nonce( 'forminator_form_custom_validation' ); ?>';
-                                            $.ajax({
-                                                url: '<?php echo admin_url( 'admin-ajax.php' ); ?>',
-                                                type: 'POST',
-                                                data: {
-                                                    action: 'forminator_form_custom_validation',
-                                                    field_name: '<?php echo $field_name; ?>',
-                                                    field_value: field_value,
-                                                    ajax_nonce: ajax_nonce,
-                                                },
-                                                success: function(response){
-                                                    if ( ! response.success ) {
-                                                        $('.forminator-button-next').prop('disabled', true);
-                                                        $(field_name).parent().addClass('forminator-has_error');
-                                                        $('.forminator-error-message').remove();
-                                                        $(field_name).parent().append('<span class="forminator-error-message">'+response.message+'</span>');
-                                                    } else {
-                                                        $(field_name).parent().removeClass('forminator-has_error');
-                                                        $('.forminator-error-message').remove();
-                                                        $('.forminator-button-next').prop('disabled', false);
-                                                    }
-                                                }
-                                            });
-                                        }
-                                    });
-                                })(jQuery);
-                            }
-                        }, false);
-                    </script>
-                    <?php
-                }
-            }
-
-            public function forminator_form_field_custom_validation() {
-                if ( ! isset( $_POST['field_value'] ) || ! isset( $_POST['ajax_nonce'] ) || ! isset( $_POST['field_name'] ) ) {
-                    return;
-                }
-
-                $field_name  = sanitize_text_field( wp_unslash( $_POST['field_name'] ) );
-                $field_value = sanitize_text_field( wp_unslash( $_POST['field_value'] ) );
-                $ajax_nonce  = sanitize_text_field( wp_unslash( $_POST['ajax_nonce'] ) );
-
-                if ( ! wp_verify_nonce( $ajax_nonce, 'forminator_form_custom_validation' ) ) {
-                    return;
-                }
-
-                $validation_result = $this->form_custom_validation( $field_name, $field_value );
-                wp_send_json( $validation_result );
-            }
-
-            public function form_custom_validation( $field_name, $field_value ) {
-                foreach ( $this->form_custom_validation_list as $form_custom_validation ) {
-                    if ( $field_name === $form_custom_validation['field_name'] ) {
-                        $field_validation_patterns = $form_custom_validation['field_validation_pattern'];
-                        foreach ( $field_validation_patterns as $field_validation_pattern ) {
-                            if ( preg_match( $field_validation_pattern, $field_value ) ) {
-                                return array(
-                                    'success' => true,
-                                    'message' => '',
-                                );
-                            }
-                        }
-                        return array(
-                            'success' => false,
-                            'message' => $form_custom_validation['error_message'],
-                        );
-                    }
-                }
-            }
-
-            public function forminator_form_ajax_submit_response_handler( $response ) {
-                if ( ! empty( $response ) ) {
-                    return $response;
-                } else {
-                    foreach ( $this->form_custom_validation_list as $form_custom_validation ) {
-                        if ( isset( $_POST['form_id'] ) && $_POST['form_id'] === $form_custom_validation['form_id'] ) {
-                            $field_name = $form_custom_validation['field_name'];
-                            if ( isset( $_POST[ $field_name ] ) ) {
-                                $field_value = sanitize_text_field( $_POST[ $field_name ] );
-                                $validation_result = $this->form_custom_validation( $field_name, $field_value );
-                                if ( ! $validation_result['success'] ) {
-                                    $response_error = array( $field_name => $validation_result['message'] );
-                                    $response       = array();
-                                    array_push( $response, $response_error );
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                return $response;
-            }
+      public static function get_instance()
+      {
+        if (is_null(self::$instance)) {
+          self::$instance = new self();
         }
-        // Initialize.
-        Forminator_Field_Custom_Validation::get_instance();
+        return self::$instance;
+      }
+
+      public function forminator_field_custom_validation_js()
+      {
+        foreach ($this->form_custom_validation_list as $form_custom_validation) {
+          $form_id = $form_custom_validation['form_id'];
+          $field_name = $form_custom_validation['field_name'];
+?>
+          <script type="text/javascript">
+            document.addEventListener('DOMContentLoaded', function() {
+              let form_id_input = document.querySelector('input[name="form_id"]');
+              let field_name = document.querySelector('input[id="<?php echo $field_name; ?>"]');
+              if (form_id_input && field_name && form_id_input.value == '<?php echo $form_id; ?>') {
+                (function($) {
+                  $(field_name).on('keyup blur', function() {
+                    let field_value = $(this).val();
+                    if (!/^\d{14}$/.test(field_value)) {
+                      $('.forminator-button-next').prop('disabled', true);
+                      $(field_name).parent().addClass('forminator-has_error');
+                      $('.forminator-error-message').remove();
+                      $(field_name).parent().append('<span class="forminator-error-message"><?php echo $form_custom_validation['error_message']; ?></span>');
+                    } else {
+                      let ajax_nonce = '<?php echo wp_create_nonce('forminator_form_custom_validation'); ?>';
+                      $.ajax({
+                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                        type: 'POST',
+                        data: {
+                          action: 'forminator_form_custom_validation',
+                          field_name: '<?php echo $field_name; ?>',
+                          field_value: field_value,
+                          ajax_nonce: ajax_nonce,
+                        },
+                        success: function(response) {
+                          if (!response.success) {
+                            $('.forminator-button-next').prop('disabled', true);
+                            $(field_name).parent().addClass('forminator-has_error');
+                            $('.forminator-error-message').remove();
+                            $(field_name).parent().append('<span class="forminator-error-message">' + response.message + '</span>');
+                          } else {
+                            $(field_name).parent().removeClass('forminator-has_error');
+                            $('.forminator-error-message').remove();
+                            $('.forminator-button-next').prop('disabled', false);
+                          }
+                        }
+                      });
+                    }
+                  });
+                })(jQuery);
+              }
+            }, false);
+          </script>
+<?php
+        }
+      }
+
+      public function forminator_form_field_custom_validation()
+      {
+        if (!isset($_POST['field_value']) || !isset($_POST['ajax_nonce']) || !isset($_POST['field_name'])) {
+          return;
+        }
+
+        $field_name  = sanitize_text_field(wp_unslash($_POST['field_name']));
+        $field_value = sanitize_text_field(wp_unslash($_POST['field_value']));
+        $ajax_nonce  = sanitize_text_field(wp_unslash($_POST['ajax_nonce']));
+
+        if (!wp_verify_nonce($ajax_nonce, 'forminator_form_custom_validation')) {
+          return;
+        }
+
+        $validation_result = $this->form_custom_validation($field_name, $field_value);
+        wp_send_json($validation_result);
+      }
+
+      public function form_custom_validation($field_name, $field_value)
+      {
+        foreach ($this->form_custom_validation_list as $form_custom_validation) {
+          if ($field_name === $form_custom_validation['field_name']) {
+            $field_validation_patterns = $form_custom_validation['field_validation_pattern'];
+            foreach ($field_validation_patterns as $field_validation_pattern) {
+              if (preg_match($field_validation_pattern, $field_value)) {
+                return array(
+                  'success' => true,
+                  'message' => '',
+                );
+              }
+            }
+            return array(
+              'success' => false,
+              'message' => $form_custom_validation['error_message'],
+            );
+          }
+        }
+      }
+
+      public function forminator_form_ajax_submit_response_handler($response)
+      {
+        if (!empty($response)) {
+          return $response;
+        } else {
+          foreach ($this->form_custom_validation_list as $form_custom_validation) {
+            if (isset($_POST['form_id']) && $_POST['form_id'] === $form_custom_validation['form_id']) {
+              $field_name = $form_custom_validation['field_name'];
+              if (isset($_POST[$field_name])) {
+                $field_value = sanitize_text_field($_POST[$field_name]);
+                $validation_result = $this->form_custom_validation($field_name, $field_value);
+                if (!$validation_result['success']) {
+                  $response_error = array($field_name => $validation_result['message']);
+                  $response       = array();
+                  array_push($response, $response_error);
+                  break;
+                }
+              }
+            }
+          }
+        }
+        return $response;
+      }
     }
+    // Initialize.
+    Forminator_Field_Custom_Validation::get_instance();
+  }
 }
 ?>
